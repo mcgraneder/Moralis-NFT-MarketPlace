@@ -29,7 +29,7 @@ contract NFTToken is ERC721 {
 
     //create item function
     function createItem(string memory uri) public returns (uint256) {
-        _tokenIds.increment;
+        _tokenIds.increment();
         uint256 newItemId = _tokenIds.current();
 
         //we can call mint from the ERC721 contract to mint our nft token

@@ -1,27 +1,33 @@
 Moralis.initialize("inEEPkTr0lSBMAv6LgCpkEodRsMsEoNw4BCv2ETu");
 Moralis.serverURL = 'https://lkvqpj0wzrda.moralis.io:2053/server'
-const TOKEN_CONTRACT_ADDRESS = "0x73caADaA4C24406e9A8a7Bdc48668f590b7931db";
+const TOKEN_CONTRACT_ADDRESS = "0xc7237f8C0B466bd784293dA13E370c7afF4969aB";
 
 
 //initialise morails
 init = async () => {
+    hideElement(userItemsSection);
     hideElement(userInfo);
     hideElement(createItemForm);
     window.web3 = await Moralis.Web3.enable();
     window.tokenContract =  new web3.eth.Contract(abi, TOKEN_CONTRACT_ADDRESS);
     initUser();
+    
 }
 
 initUser = async () => {
     if (await Moralis.User.current()) {
-
+        
         hideElement(userConnectButton);
         showElement(userProfileButton);
         showElement(openCreateItemBtn);
+        showElement(openUserItemsButton);
+        loadUseritems();
     }else {
         showElement(userConnectButton);
         hideElement(userProfileButton);
-        hideElement(openCreateItemBtn)
+        hideElement(openCreateItemBtn);
+        hideElement(openUserItemsButton);
+
     }
 }
 
@@ -68,6 +74,18 @@ openUserInfo = async () => {
     }
 }
 
+//open user items
+openUserItems = async () => {
+    user = await Moralis.User.current();
+    if (user) {
+        
+        showElement(userItemsSection);
+        // 
+    }else{
+        login();
+    }
+}
+
 
 //save userinfo
 saveUserInfo = async () => {
@@ -100,9 +118,10 @@ createItem = async () => {
     const nftFile = new Moralis.File("nftFile.jpg", createItemFile.files[0]);
     await nftFile.saveIPFS();
 
+
     const nftFilePath = nftFile.ipfs();
     const nftFileHash = nftFile.hash();
-
+    console.log(nftFileHash);
     const metadata = {
         name: createItemNameField.value,
         description: createItemDescriptionField.value,
@@ -141,10 +160,51 @@ createItem = async () => {
 mintNft = async (metadataUrl) => {
     const receipt = await tokenContract.methods.createItem(metadataUrl).send({from: ethereum.selectedAddress});
     console.log(receipt);
+
     //we can get our token id here. In the safeMint  function in the ERC721 contract
     //an even called transfer gets fired which returns a ew things most importantly the tokenID
     //we can call this events return value to access this tokenId
     return receipt.events.Transfer.returnValues.tokenId;
+}
+
+loadUseritems = async() => {
+    const ownedItems = await Moralis.Cloud.run("getUserItems");
+    // console.log(ownedItems);
+    ownedItems.forEach(item => {
+        getAndRenderItemData(item, renderUserItem)
+    })
+}
+
+
+initTemplate = (id) => {
+    const template = document.getElementById(id);
+    template.id = "";
+    template.parentNode.removeChild(template);
+    return template;
+
+}
+
+getAndRenderItemData = (item, renderfunction) => {
+    fetch(item.tokenUri)
+    .then(response => response.json())
+    .then(data => {
+        data.symbol = item.symbol;
+        data.tokenId = item.tokenId;
+        data.tokenAddress = item.tokenAddress;
+        renderfunction(data)
+    })
+}
+
+renderUserItem = (item) => {
+    const userItem = userItemsTemplate.cloneNode(true);
+    userItem.getElementsByTagName("img")[0].src = item.image;
+    userItem.getElementsByTagName("img")[0].alt = item.name;
+    userItem.getElementsByTagName("h5")[0].innerText = item.name;
+    userItem.getElementsByTagName("p")[0].innerText = item.description;
+    userItems.appendChild(userItem);
+
+    
+
 }
 
 hideElement = (element) => element.style.display = "none";
@@ -185,5 +245,13 @@ document.getElementById("fileCloseCreateItem").onclick = () => hideElement(creat
 document.getElementById("btnCreateItem").onclick = createItem;
 
 
+//const user items section
+const userItemsSection = document.getElementById("userItems");
+const userItems = document.getElementById("userItemsList");
+document.getElementById("btnCloseUserItems").onclick = () => hideElement(userItemsSection);
+const openUserItemsButton = document.getElementById("btnMyItems");
+openUserItemsButton.onclick = openUserItems;
 
+
+const userItemsTemplate = initTemplate("itemTemplate")
 init();
