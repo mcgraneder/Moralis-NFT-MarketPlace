@@ -1,7 +1,7 @@
 Moralis.initialize("inEEPkTr0lSBMAv6LgCpkEodRsMsEoNw4BCv2ETu");
 Moralis.serverURL = 'https://lkvqpj0wzrda.moralis.io:2053/server'
-const TOKEN_CONTRACT_ADDRESS = "0xc7237f8C0B466bd784293dA13E370c7afF4969aB";
-
+const TOKEN_CONTRACT_ADDRESS = "0x13506f38a837Ae2c9F78DDcC761dCB0499Dd8Fbd";
+const MARKETPLACE_CONTRACT = "0xF9F6423d1577660e55f4940E2A207B6287a0BCFb";
 
 //initialise morails
 init = async () => {
@@ -10,6 +10,7 @@ init = async () => {
     hideElement(createItemForm);
     window.web3 = await Moralis.Web3.enable();
     window.tokenContract =  new web3.eth.Contract(abi, TOKEN_CONTRACT_ADDRESS);
+    window.marketPlaceContract =  new web3.eth.Contract(marketplaceAbi, MARKETPLACE_CONTRACT);
     initUser();
     
 }
@@ -154,6 +155,21 @@ createItem = async () => {
     console.log(nftFile.ipfs());
     console.log(item);
 
+    user = await Moralis.User.current();
+    const userAddress = user.get("ethAddress");
+
+    switch(createItemStatusField.value) {
+        case "0":
+            return;
+        case "1":
+            await ensureMarketPlaceIsApproved(nftId, TOKEN_CONTRACT_ADDRESS);
+            await marketPlaceContract.methods.addItemToMarket(nftId, TOKEN_CONTRACT_ADDRESS, createItemPriceField.value).send({from: userAddress});
+            break;
+        case "2":
+            alert("not yet supported");
+            return;
+    }
+
 }
 
 //create function to call out contract to mint an NFT
@@ -176,22 +192,28 @@ loadUseritems = async() => {
 }
 
 
-initTemplate = (id) => {
-    const template = document.getElementById(id);
-    template.id = "";
-    template.parentNode.removeChild(template);
-    return template;
 
-}
 
-getAndRenderItemData = (item, renderfunction) => {
-    fetch(item.tokenUri)
+// getAndRenderItemData = (item, renderfunction) => {
+//     fetch(item.tokenUri)
+//     .then(response => response.json())
+//     .then(data => {
+//         data.symbol = item.symbol;
+//         data.tokenId = item.tokenId;
+//         data.tokenAddress = item.tokenAddress;
+//         renderfunction(data)
+//     })
+// }
+
+getAndRenderItemData = (item, renderFunction) => {
+    
+    fetch(item.tokenuri)
     .then(response => response.json())
     .then(data => {
-        data.symbol = item.symbol;
-        data.tokenId = item.tokenId;
-        data.tokenAddress = item.tokenAddress;
-        renderfunction(data)
+        item.name = data.name;
+        item.description = data.description;
+        item.image = data.image;
+        renderFunction(item);
     })
 }
 
@@ -206,6 +228,41 @@ renderUserItem = (item) => {
     
 
 }
+
+initTemplate = (id) => {
+    const template = document.getElementById(id);
+    template.id = "";
+    template.parentNode.removeChild(template);
+    return template;
+}
+
+renderUserItem = async (item) => {
+    
+
+    const userItem = userItemsTemplate.cloneNode(true);
+    userItem.getElementsByTagName("img")[0].src = item.image;
+    userItem.getElementsByTagName("img")[0].alt = item.name;
+    userItem.getElementsByTagName("h5")[0].innerText = item.name;
+    userItem.getElementsByTagName("p")[0].innerText = item.description;
+
+    
+
+   
+    userItems.appendChild(userItem);
+}
+
+ensureMarketPlaceIsApproved = async(tokenId, tokenAddress) => {
+    user = await Moralis.User.current();
+    const userAddress = user.get("ethAddress");
+    const contract = new web3.eth.Contract(marketplaceAbi, tokenAddress);
+    const approveAddress = await tokenContract.methods.getApproved(tokenId).call({from: userAddress});
+    if (approveAddress != MARKETPLACE_CONTRACT) {
+        await tokenContract.methods.approve(MARKETPLACE_CONTRACT, tokenId).send({from: userAddress});
+    }
+}
+
+
+
 
 hideElement = (element) => element.style.display = "none";
 showElement = (element) => element.style.display = "block";
@@ -231,8 +288,8 @@ const createItemForm = document.getElementById("CreateItem");
 
 const createItemNameField = document.getElementById("txtCreateItemName");
 const createItemDescriptionField = document.getElementById("txtCreateItemDescription");
-const createItemPriceField = document.getElementById("txtCreateItemPirce");
-const createItemStatusField = document.getElementById("txtCreateItemStatus");
+const createItemPriceField = document.getElementById("numCreateItemPrice");
+const createItemStatusField = document.getElementById("selectCreateItemStatus");
 const createItemFile = document.getElementById("fileCreateItemFile");
 
 
